@@ -31,6 +31,8 @@ typedef struct{
     bool init_by_app;
     void *ctx;
     volatile int tick;
+    // Flag set when uart is being closed to prevent callbacks from using freed memory
+    volatile bool closing;
 } UHFUart;
 
 int32_t uhf_uart_worker_callback(void *ctx);

@@ -136,16 +136,23 @@ void uhf_free(UHFApp* uhf_app) {
     variable_item_list_free(uhf_app->variable_item_list);
 
     // Tag
-    uhf_tag_wrapper_free(uhf_app->worker->uhf_tag_wrapper);
-
-    // Worker
+    // Stop and free worker first (join thread)
+    UHFTagWrapper* uhf_tag_wrapper = uhf_app->worker->uhf_tag_wrapper;
     uhf_worker_stop(uhf_app->worker);
     uhf_worker_free(uhf_app->worker);
 
     // Device
     uhf_device_free(uhf_app->uhf_device);
 
+    // Free the shared tag wrapper after worker and device are stopped
+    uhf_tag_wrapper_free(uhf_tag_wrapper);
+
     // View Dispatcher
+    // Unregister callbacks/context to avoid callbacks after freeing
+    view_dispatcher_set_custom_event_callback(uhf_app->view_dispatcher, NULL);
+    view_dispatcher_set_navigation_event_callback(uhf_app->view_dispatcher, NULL);
+    view_dispatcher_set_tick_event_callback(uhf_app->view_dispatcher, NULL, 0);
+    view_dispatcher_set_event_callback_context(uhf_app->view_dispatcher, NULL);
     view_dispatcher_free(uhf_app->view_dispatcher);
 
     // Scene Manager

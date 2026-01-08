@@ -35,12 +35,11 @@ void uhf_uart_default_rx_callback(
     FuriHalSerialRxEvent event,
     void* ctx) {
     UHFUart* uart = (UHFUart*)ctx;
-    // FURI_LOG_E("UHF_UART", "UHF UART RX CALLBACK");
+    if(!uart) return;
+    if(uart->closing) return;
     if((event & FuriHalSerialRxEventData) == FuriHalSerialRxEventData) {
         uint8_t data = furi_hal_serial_async_rx(handle);
-        // if(data == UHF_UART_FRAME_START){
-        //     uhf_buffer_reset(uart->buffer);
-        // }
+        if(!uart->buffer) return;
         if(uhf_is_buffer_closed(uart->buffer)) {
             return;
         }
@@ -52,8 +51,6 @@ void uhf_uart_default_rx_callback(
         }
         uhf_buffer_append_single(uart->buffer, data);
         uhf_uart_tick_reset(uart);
-        // furi_stream_buffer_send(uart->rx_buff_stream, (void*)&data, 1, 0);
-        // furi_thread_flags_set(furi_thread_get_id(uart->thread), UHFUartWorkerWaitingDataFlag);
     }
 }
 
@@ -65,6 +62,7 @@ UHFUart* uhf_uart_alloc() {
     uart->init_by_app = !furi_hal_bus_is_enabled(uart->bus);
     uart->tick = UHF_UART_WAIT_TICK;
     uart->baudrate = UHF_UART_DEFAULT_BAUDRATE;
+    uart->closing = false;
     // expansion_disable();
     if(uart->init_by_app) {
         FURI_LOG_E("UHF_UART", "UHF UART INIT BY APP");
@@ -79,12 +77,16 @@ UHFUart* uhf_uart_alloc() {
 
 void uhf_uart_free(UHFUart* uart) {
     furi_assert(uart);
+    // Signal that uart is closing so callbacks can early-exit
+    uart->closing = true;
+    // Unregister async callback to prevent further RX events
+    furi_hal_serial_async_rx_start(uart->handle, NULL, NULL, false);
     // furi_assert(uart->thread);
     // furi_thread_flags_set(furi_thread_get_id(uart->thread), UHFUartWorkerExitingFlag);
     // furi_thread_join(uart->thread);
     // furi_thread_free(uart->thread);
     // furi_stream_buffer_free(uart->rx_buff_stream);
-    uhf_buffer_free(uart->buffer);
+    if(uart->buffer) uhf_buffer_free(uart->buffer);
     if(uart->init_by_app) {
         furi_hal_serial_deinit(uart->handle);
     }
